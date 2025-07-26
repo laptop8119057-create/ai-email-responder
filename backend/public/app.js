@@ -89,7 +89,7 @@ function setupEventListeners() {
 async function loadAndDisplayEmails() {
   const container = document.getElementById('replies');
   try {
-    const response = await fetch(`${API_BASE_URL}/get-unread-emails`);
+    const response = await fetch('/get-unread-emails');
     if (!response.ok) throw new Error(`Server error: ${response.statusText}`);
     const emails = await response.json();
     if (!emails || emails.length === 0) { container.innerHTML = '<p>No unread emails found. Great job!</p>'; return; }
