@@ -1,0 +1,8 @@
+# Node modules and sensitive files
+node_modules
+.env
+credentials.json
+token.json
+
+# Optional: VSCode specific files
+.vscode/

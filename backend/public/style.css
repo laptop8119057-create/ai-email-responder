@@ -1,0 +1,153 @@
+/* C:\email-responder\backend\public\style.css */
+
+body {
+  font-family: Arial, sans-serif;
+  padding: 30px;
+  background-color: #f9f9f9;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 40px;
+  color: #333;
+}
+
+.reply-box {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-left: 6px solid #2c7be5;
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.reply-box.sent {
+  transition: all 0.5s ease-out;
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-width: 0;
+  overflow: hidden;
+}
+
+.email-header {
+  background-color: #f7f7f7;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.email-header p {
+  margin: 5px 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* --- THIS IS THE FINAL, GUARANTEED WRAPPING RULE --- */
+.original-body, .arabic-translation-text {
+  display: block; /* Ensures the element behaves like a block for wrapping */
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.translation-container {
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.translate-original-link {
+  font-size: 12px;
+  font-weight: normal;
+  margin-left: 10px;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.translate-original-link:hover {
+  text-decoration: underline;
+}
+
+#refresh-button {
+  display: block;
+  margin: 0 auto 30px auto;
+  padding: 10px 25px;
+  font-size: 16px;
+  border: 1px solid #007bff;
+  background-color: #fff;
+  color: #007bff;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+#refresh-button:hover {
+  background-color: #007bff;
+  color: #fff;
+}
+
+#refresh-button:disabled {
+  background-color: #ccc;
+  border-color: #ccc;
+  cursor: not-allowed;
+}
+
+.reply-textarea {
+  width: 98%;
+  height: 150px;
+  margin-top: 10px;
+  padding: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  resize: vertical;
+}
+
+.reply-textarea.thinking {
+  background-image: linear-gradient(-45deg, rgba(255, 255, 255, 0) 48%, rgba(0, 0, 0, 0.05) 50%, rgba(255, 255, 255, 0) 52%);
+  background-size: 30px 30px;
+  animation: thinking-animation 1.2s linear infinite;
+}
+
+@keyframes thinking-animation {
+  from { background-position: 0 0; }
+  to { background-position: -30px 0; }
+}
+
+.generate-english-button, .generate-arabic-button {
+  margin-right: 10px;
+  padding: 10px 20px;
+  font-size: 1rem;
+  border: 1px solid #28a745;
+  background-color: #28a745;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.generate-english-button:hover, .generate-arabic-button:hover {
+  background-color: #218838;
+  border-color: #218838;
+}
+
+.send-button {
+  padding: 10px 20px;
+  font-size: 1rem;
+  border: 1px solid #007bff;
+  background-color: #007bff;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.send-button:hover {
+  background-color: #0056b3;
+}
