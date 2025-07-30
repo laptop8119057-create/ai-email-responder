@@ -1,4 +1,4 @@
-// C:\email-responder\backend\server.js
+// C:\email-responder-app\backend\server.js
 
 const fs = require('fs').promises;
 const path = require('path');
@@ -49,6 +49,25 @@ app.get('/get-unread-emails', async (req, res) => {
     const gmail = google.gmail({ version: 'v1', auth });
     const listResponse = await gmail.users.messages.list({ userId: 'me', q: 'is:unread', maxResults: 5 });
     const messages = listResponse.data.messages || [];
+
+    // --- TEMPORARY TEST ---
+    // We are skipping the slow loop and sending a fast response.
+    console.log('Skipping slow processing loop for speed test.');
+    const quickResponse = [{
+        id: 'test-id',
+        threadId: 'test-thread-id',
+        subject: 'This is a speed test',
+        from: 'The Server',
+        body: 'If you can see this message, it means the server responded quickly enough and the timeout is the real problem.',
+        originalMessageId: 'test-msg-id',
+        toHeader: 'you@example.com',
+        date: new Date().toLocaleString()
+    }];
+    return res.json(quickResponse);
+    // --- END OF TEST ---
+
+    /*
+    // ORIGINAL SLOW CODE IS COMMENTED OUT
     if (messages.length === 0) { console.log('No unread emails found.'); return res.json([]); }
     const emailReplies = [];
     for (const msg of messages) {
@@ -61,14 +80,14 @@ app.get('/get-unread-emails', async (req, res) => {
       const toHeader = headers.find(h => h.name === 'To')?.value || '';
       const date = new Date(headers.find(h => h.name === 'Date')?.value || Date.now()).toLocaleString();
       
-      // --- THIS IS THE CRITICAL FIX ---
-      // Instead of using the snippet, we now parse the full body.
       const body = getEmailBody(msgData.data.payload);
       
       emailReplies.push({ id: msg.id, threadId: msgData.data.threadId, from, subject, body, originalMessageId, toHeader, date: date });
     }
     console.log(`Found and processed ${emailReplies.length} emails.`);
     res.json(emailReplies);
+    */
+
   } catch (error) {
     console.error('Error fetching emails:', error);
     res.status(500).send('Error fetching emails from Gmail.');
