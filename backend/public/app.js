@@ -1,149 +1,223 @@
-// C:\email-responder\backend\public\app.js
+// FINAL PRODUCTION app.js
 
-const API_BASE_URL = '';
+document.addEventListener('DOMContentLoaded', () => {
+    const refreshButton = document.getElementById('refreshEmails');
+    const emailListDiv = document.getElementById('emailList');
 
-function setupEventListeners() {
-  const container = document.getElementById('replies');
-  container.addEventListener('click', async (event) => {
-    const targetButton = event.target;
-    const replyBox = targetButton.closest('.reply-box');
-    if (!replyBox) return;
-    // --- HANDLE "TRANSLATE ORIGINAL" LINK ---
-    if (targetButton.classList.contains('translate-original-link')) {
-      event.preventDefault();
-      const link = targetButton;
-      const targetId = link.dataset.targetId;
-      const bodySpan = document.getElementById(targetId);
-      const translationContainerId = link.dataset.translationContainerId;
-      const translationContainer = document.getElementById(translationContainerId);
-      if (!bodySpan || !translationContainer) return;
-      const currentText = bodySpan.textContent;
-      if (currentText.trim() === "") return;
-      link.textContent = '(Translating...)';
-      link.style.pointerEvents = 'none';
-      try {
-        const response = await fetch(`${API_BASE_URL}/translate-reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ textToTranslate: currentText }) });
-        if (!response.ok) throw new Error('Translation failed.');
-        const data = await response.json();
-        translationContainer.innerHTML = `<hr style="margin: 15px 0;"><p><strong>Arabic Translation:</strong><br><span class="arabic-translation-text">${data.translatedText}</span></p>`;
-        translationContainer.style.direction = 'rtl';
-        translationContainer.style.textAlign = 'right';
-        link.style.display = 'none';
-      } catch (error) {
-        console.error(error);
-        alert(error.message);
-        link.textContent = '(Translate to Arabic)';
-        link.style.pointerEvents = 'auto';
-      }
+    // Function to fetch details for a single email and display it
+    async function fetchAndDisplayEmail(emailId) {
+        try {
+            const res = await fetch(`/get-email-details/${emailId.id}`);
+            if (!res.ok) throw new Error(`Failed to fetch details for email ${emailId.id}`);
+            const email = await res.json();
+            
+            // Once details are fetched, replace the placeholder
+            const placeholderDiv = document.getElementById(`placeholder-${email.id}`);
+            if (placeholderDiv) {
+                placeholderDiv.innerHTML = createEmailHTML(email);
+                addEventListenersToEmail(email.id);
+            }
+
+        } catch (error) {
+            console.error(error);
+            const placeholderDiv = document.getElementById(`placeholder-${emailId.id}`);
+            if(placeholderDiv) placeholderDiv.innerHTML = `<p style="color:red;">Could not load email: ${emailId.id}</p>`;
+        }
     }
-    // --- HANDLE GENERATE BUTTONS ---
-    if (targetButton.classList.contains('generate-english-button') || targetButton.classList.contains('generate-arabic-button')) {
-      const isArabic = targetButton.classList.contains('generate-arabic-button');
-      const endpoint = isArabic ? '/generate-arabic-reply' : '/generate-english-reply';
-      const userHint = window.prompt("What should this reply be about? (e.g., 'agree to the meeting on Friday at 2pm')");
-      if (userHint === null || userHint.trim() === "") return;
-      targetButton.textContent = 'Generating...';
-      targetButton.disabled = true;
-      const otherButton = isArabic ? replyBox.querySelector('.generate-english-button') : replyBox.querySelector('.generate-arabic-button');
-      if (otherButton) otherButton.disabled = true;
-      const textarea = replyBox.querySelector('.reply-textarea');
-      const emailData = { from: replyBox.dataset.from, subject: replyBox.dataset.subject, body: replyBox.dataset.body, userHint: userHint };
-      try {
-        textarea.classList.add('thinking');
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(emailData) });
-        if (!response.ok) throw new Error('Failed to generate reply from AI.');
-        const data = await response.json();
+
+    // Function to load all emails
+    async function loadEmails() {
+        emailListDiv.innerHTML = '<div class="loader"></div>'; // Show loader
+        try {
+            // STEP 1: Get only the list of email IDs
+            const res = await fetch('/get-unread-email-ids');
+            if (!res.ok) throw new Error('Is the backend server running? (server.js)');
+            const emailIds = await res.json();
+
+            if (emailIds.length === 0) {
+                emailListDiv.innerHTML = '<p>No unread emails found.</p>';
+                return;
+            }
+
+            // Clear the list and create a placeholder for each email
+            emailListDiv.innerHTML = '';
+            emailIds.forEach(emailId => {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'email-item-placeholder';
+                placeholder.id = `placeholder-${emailId.id}`;
+                placeholder.innerHTML = `<p>Loading email...</p>`;
+                emailListDiv.appendChild(placeholder);
+            });
+            
+            // STEP 2: Fetch details for each email individually
+            for (const emailId of emailIds) {
+                fetchAndDisplayEmail(emailId);
+            }
+
+        } catch (error) {
+            emailListDiv.innerHTML = `<p style="color: red;">Failed to load emails. ${error.message}</p>`;
+        }
+    }
+
+    // --- All other functions remain mostly the same ---
+    
+    refreshButton.addEventListener('click', loadEmails);
+
+    // Initial load
+    loadEmails();
+});
+
+
+function createEmailHTML(email) {
+    return `
+        <div class="email-header">
+            <p><strong>Date:</strong> ${email.date}</p>
+            <p><strong>Subject:</strong> ${email.subject}</p>
+            <p><strong>From:</strong> ${escapeHTML(email.from)}</p>
+            <p><strong>To:</strong> ${escapeHTML(email.toHeader)}</p>
+        </div>
+        <div class="email-body">
+            <p><strong>Original Message:</strong> <span class="translate-link" style="cursor:pointer; color:blue; text-decoration:underline;">(Translate to Arabic)</span></p>
+            <pre class="original-text">${escapeHTML(email.body)}</pre>
+            <pre class="translated-text" style="display:none;"></pre>
+        </div>
+        <div class="email-reply">
+            <textarea placeholder="Click a 'Generate' button or type your reply here..."></textarea>
+            <div class="user-hint">
+                 <input type="text" placeholder="Optional: Add a hint for the AI (e.g., 'Politely decline')">
+            </div>
+            <button class="generate-en-reply">Generate English Reply</button>
+            <button class="generate-ar-reply">Generate Arabic Reply</button>
+            <button class="send-email">Send Email</button>
+        </div>
+    `;
+}
+
+function addEventListenersToEmail(emailId) {
+    const emailDiv = document.getElementById(`placeholder-${emailId}`);
+    if (!emailDiv) return;
+
+    emailDiv.querySelector('.generate-en-reply').addEventListener('click', () => handleGenerateReply(emailDiv, 'en'));
+    emailDiv.querySelector('.generate-ar-reply').addEventListener('click', () => handleGenerateReply(emailDiv, 'ar'));
+    emailDiv.querySelector('.send-email').addEventListener('click', () => handleSendEmail(emailDiv));
+    emailDiv.querySelector('.translate-link').addEventListener('click', () => handleTranslate(emailDiv));
+}
+
+async function handleGenerateReply(emailDiv, lang) {
+    const originalText = emailDiv.querySelector('.original-text').textContent;
+    const subject = emailDiv.querySelector('.email-header p:nth-child(2)').textContent.replace('Subject: ', '');
+    const from = emailDiv.querySelector('.email-header p:nth-child(3)').textContent.replace('From: ', '');
+    const userHint = emailDiv.querySelector('.user-hint input').value;
+    const textarea = emailDiv.querySelector('textarea');
+    
+    textarea.value = 'Generating...';
+
+    try {
+        const endpoint = lang === 'ar' ? '/generate-arabic-reply' : '/generate-english-reply';
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ from, subject, body: originalText, userHint })
+        });
+        const data = await res.json();
         textarea.value = data.reply;
-        textarea.style.direction = isArabic ? 'rtl' : 'ltr';
-      } catch (error) {
-        console.error(error);
-        alert(error.message);
-      } finally {
-        textarea.classList.remove('thinking');
-        targetButton.textContent = isArabic ? 'Generate Arabic Reply' : 'Generate English Reply';
-        targetButton.disabled = false;
-        if (otherButton) otherButton.disabled = false;
-      }
+    } catch (err) {
+        textarea.value = 'Failed to generate reply.';
     }
-    // --- HANDLE "SEND EMAIL" BUTTON ---
-    if (targetButton.classList.contains('send-button')) {
-      const sendButton = targetButton;
-      const sendEmailData = { from: replyBox.dataset.from, toHeader: replyBox.dataset.to, subject: replyBox.dataset.subject, threadId: replyBox.dataset.threadid, originalMessageId: replyBox.dataset.messageid, replyBody: replyBox.querySelector('.reply-textarea').value };
-      try {
-        sendButton.textContent = 'Sending...';
-        sendButton.disabled = true;
-        const response = await fetch(`${API_BASE_URL}/send-email`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sendEmailData) });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Failed to send');
-        sendButton.textContent = '✅ Sent!';
-        replyBox.classList.add('sent');
-      } catch (error) {
-        console.error('Error sending email:', error);
-        alert(`Error: ${error.message}`);
+}
+
+async function handleSendEmail(emailDiv) {
+    const sendButton = emailDiv.querySelector('.send-email');
+    sendButton.textContent = 'Sending...';
+    sendButton.disabled = true;
+
+    // We need to retrieve the original email data again. 
+    // This is not ideal, a better architecture would store this in memory or data attributes.
+    // For now, this will work. Let's find the ID from the parent.
+    const emailId = emailDiv.id.replace('placeholder-', '');
+     try {
+        // We must re-fetch the details to ensure we have the correct metadata.
+        const res = await fetch(`/get-email-details/${emailId}`);
+        if(!res.ok) throw new Error("Could not refetch email details to send.");
+        const email = await res.json();
+       
+        const replyBody = emailDiv.querySelector('textarea').value;
+
+        const sendRes = await fetch('/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                from: email.from,
+                toHeader: email.toHeader,
+                subject: email.subject,
+                replyBody,
+                threadId: email.threadId,
+                originalMessageId: email.originalMessageId
+            })
+        });
+        
+        if (sendRes.ok) {
+            sendButton.textContent = 'Sent!';
+            emailDiv.style.opacity = '0.5';
+            setTimeout(() => emailDiv.remove(), 2000);
+        } else {
+             const errorData = await sendRes.json();
+             alert(`Failed to send email: ${errorData.message}`);
+             sendButton.textContent = 'Send Email';
+             sendButton.disabled = false;
+        }
+
+    } catch (err) {
+        alert('An error occurred. ' + err.message);
         sendButton.textContent = 'Send Email';
         sendButton.disabled = false;
-      }
     }
-  });
 }
-async function loadAndDisplayEmails() {
-  const container = document.getElementById('replies');
-  try {
-    const response = await fetch('/get-unread-emails');
-    if (!response.ok) throw new Error(`Server error: ${response.statusText}`);
-    const emails = await response.json();
-    if (!emails || emails.length === 0) { container.innerHTML = '<p>No unread emails found. Great job!</p>'; return; }
-    container.innerHTML = '';
-    emails.forEach(email => {
-      const replyDiv = document.createElement('div');
-      replyDiv.className = 'reply-box';
-      replyDiv.dataset.emailId = email.id;
-      replyDiv.dataset.threadid = email.threadId;
-      replyDiv.dataset.from = email.from;
-      replyDiv.dataset.to = email.toHeader;
-      replyDiv.dataset.subject = email.subject;
-      replyDiv.dataset.messageid = email.originalMessageId;
-      replyDiv.dataset.body = email.body;
-      replyDiv.innerHTML = `
-        <div class="email-header">
-          <p><strong>Date:</strong> ${email.date}</p>
-          <p><strong>Subject:</strong> ${email.subject}</p>
-          <p><strong>From:</strong> ${email.from}</p>
-          <p><strong>To:</strong> ${email.toHeader}</p>
-        </div>
-        <hr>
-        <p>
-          <strong>Original Message:</strong>
-          <a href="#" class="translate-original-link" data-target-id="original-body-${email.id}" data-translation-container-id="translation-container-${email.id}">(Translate to Arabic)</a>
-          <br>
-          <!-- THIS IS THE CORRECTED LINE - The class="original-body" was added -->
-          <span id="original-body-${email.id}" class="original-body">${email.body}</span>
-        </p>
-        <div class="translation-container" id="translation-container-${email.id}"></div>
-        <hr>
-        <textarea class="reply-textarea" placeholder="Click a 'Generate' button or type your reply here..."></textarea>
-        <br>
-        <button class="generate-english-button">Generate English Reply</button>
-        <button class="generate-arabic-button">Generate Arabic Reply</button>
-        <button class="send-button">Send Email</button>
-      `;
-      container.appendChild(replyDiv);
-    });
-  } catch (error) {
-    console.error('Failed to load emails:', error);
-    container.innerHTML = `<p style="color: red;">Failed to load emails. Is the backend server running? (node server.js)</p>`;
-  }
+
+async function handleTranslate(emailDiv) {
+    const originalTextElem = emailDiv.querySelector('.original-text');
+    const translatedTextElem = emailDiv.querySelector('.translated-text');
+    const translateLink = emailDiv.querySelector('.translate-link');
+
+    // If already translated, just toggle visibility
+    if (translatedTextElem.textContent) {
+        originalTextElem.style.display = 'none';
+        translatedTextElem.style.display = 'block';
+        translateLink.textContent = '(Show Original)';
+        translateLink.onclick = () => showOriginal(emailDiv); // Change event handler
+        return;
+    }
+
+    translateLink.textContent = '(Translating...)';
+    try {
+        const res = await fetch('/translate-reply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ textToTranslate: originalTextElem.textContent })
+        });
+        const data = await res.json();
+        translatedTextElem.textContent = data.translatedText;
+        originalTextElem.style.display = 'none';
+        translatedTextElem.style.display = 'block';
+        translateLink.textContent = '(Show Original)';
+        translateLink.onclick = () => showOriginal(emailDiv); // Change event handler
+
+    } catch (err) {
+        alert('Failed to translate.');
+        translateLink.textContent = '(Translate to Arabic)';
+    }
 }
-async function initialize() {
-  document.getElementById('refresh-button').addEventListener('click', async (event) => {
-    const refreshButton = event.target;
-    refreshButton.textContent = 'Refreshing...';
-    refreshButton.disabled = true;
-    await loadAndDisplayEmails();
-    refreshButton.textContent = 'Refresh Emails';
-    refreshButton.disabled = false;
-  });
-  await loadAndDisplayEmails();
-  setupEventListeners();
+
+function showOriginal(emailDiv) {
+    emailDiv.querySelector('.original-text').style.display = 'block';
+    emailDiv.querySelector('.translated-text').style.display = 'none';
+    const translateLink = emailDiv.querySelector('.translate-link');
+    translateLink.textContent = '(Translate to Arabic)';
+    translateLink.onclick = () => handleTranslate(emailDiv); // Reset to original handler
 }
-initialize();
+
+function escapeHTML(str) {
+    const p = document.createElement("p");
+    p.appendChild(document.createTextNode(str));
+    return p.innerHTML;
+}
