@@ -39,51 +39,37 @@ function getEmailBody(payload) {
 }
 
 // --- SERVER ENDPOINTS ---
-
-// STEP 1: Fast endpoint to only get message IDs
-app.get('/get-unread-email-ids', async (req, res) => {
-    console.log('Received request to /get-unread-email-ids');
-    try {
-        const auth = await authorize();
-        const gmail = google.gmail({ version: 'v1', auth });
-        const listResponse = await gmail.users.messages.list({ userId: 'me', q: 'is:unread', maxResults: 5 });
-        const messages = listResponse.data.messages || [];
-        console.log(`Found ${messages.length} email IDs.`);
-        res.json(messages); // Send back only the list of IDs
-    } catch (error) {
-        console.error('Error fetching email IDs:', error);
-        res.status(500).send('Error fetching email IDs from Gmail.');
+app.get('/get-unread-emails', async (req, res) => {
+  console.log('Received request to /get-unread-emails');
+  try {
+    const auth = await authorize();
+    const gmail = google.gmail({ version: 'v1', auth });
+    const listResponse = await gmail.users.messages.list({ userId: 'me', q: 'is:unread', maxResults: 5 });
+    const messages = listResponse.data.messages || [];
+    if (messages.length === 0) { console.log('No unread emails found.'); return res.json([]); }
+    const emailReplies = [];
+    for (const msg of messages) {
+      const msgData = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
+      const headers = msgData.data.payload.headers;
+      
+      const subject = headers.find(h => h.name === 'Subject')?.value || '';
+      const from = headers.find(h => h.name === 'From')?.value || '';
+      const originalMessageId = headers.find(h => h.name === 'Message-ID')?.value || '';
+      const toHeader = headers.find(h => h.name === 'To')?.value || '';
+      const date = new Date(headers.find(h => h.name === 'Date')?.value || Date.now()).toLocaleString();
+      
+      // --- THIS IS THE CRITICAL FIX ---
+      // Instead of using the snippet, we now parse the full body.
+      const body = getEmailBody(msgData.data.payload);
+      
+      emailReplies.push({ id: msg.id, threadId: msgData.data.threadId, from, subject, body, originalMessageId, toHeader, date: date });
     }
-});
-
-// STEP 2: Endpoint to get details for ONE specific email
-app.get('/get-email-details/:messageId', async (req, res) => {
-    const { messageId } = req.params;
-    console.log(`Received request for details of message: ${messageId}`);
-    try {
-        const auth = await authorize();
-        const gmail = google.gmail({ version: 'v1', auth });
-        const msgData = await gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' });
-        
-        const headers = msgData.data.payload.headers;
-        const subject = headers.find(h => h.name === 'Subject')?.value || '';
-        const from = headers.find(h => h.name === 'From')?.value || '';
-        const originalMessageId = headers.find(h => h.name === 'Message-ID')?.value || '';
-        const toHeader = headers.find(h => h.name === 'To')?.value || '';
-        const date = new Date(headers.find(h => h.name === 'Date')?.value || Date.now()).toLocaleString();
-        const body = getEmailBody(msgData.data.payload);
-
-        const emailDetails = { 
-            id: msgData.data.id, 
-            threadId: msgData.data.threadId, 
-            from, subject, body, originalMessageId, toHeader, date 
-        };
-        console.log(`Processed details for message: ${messageId}`);
-        res.json(emailDetails);
-    } catch (error) {
-        console.error(`Error fetching details for message ${messageId}:`, error);
-        res.status(500).send(`Error fetching details for message ${messageId}.`);
-    }
+    console.log(`Found and processed ${emailReplies.length} emails.`);
+    res.json(emailReplies);
+  } catch (error) {
+    console.error('Error fetching emails:', error);
+    res.status(500).send('Error fetching emails from Gmail.');
+  }
 });
 
 
